@@ -1,12 +1,13 @@
-// ─── Gemini APIキー取得手順 ────────────────────────────────────
-// 1. https://aistudio.google.com/ にGoogleアカウントでアクセス
-// 2. 左メニュー「Get API key」→「Create API key」
-// 3. 発行されたキーを .env.local に保存:
-//    VITE_GEMINI_API_KEY=AIzaSy...
-// 4. npm run dev を再起動
+// ─── Groq APIキー取得手順 ──────────────────────────────────────
+// 1. https://console.groq.com にアクセス
+// 2. Googleアカウントまたはメールでサインアップ（60秒・クレカ不要）
+// 3. 「API Keys」→「Create API Key」でキー発行（gsk_で始まる）
+// 4. .env.local に保存:
+//    VITE_GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxx
+// 5. npm run dev を再起動
 //
-// .env.local に以下を追記（ANTHROPIC_API_KEYの行は削除してOK）:
-// VITE_GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// .env.local に以下を記載（GeminiのVITE_GEMINI_API_KEY行は削除してOK）:
+// VITE_GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxx
 // ──────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef } from 'react'
@@ -25,11 +26,11 @@ const C = {
   border:    '#E8E5DE',
   muted:     '#8C8C8C',
   subtle:    '#4A4A5A',
+  groq:      '#F55036',
 }
 
-// ─── API Key (Gemini) ──────────────────────────────────────────
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`
+// ─── API Key (Groq) ────────────────────────────────────────────
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY
 
 // ─── System Prompt ─────────────────────────────────────────────
 const SYSTEM_PROMPT = `
@@ -89,19 +90,32 @@ function LoadingDots() {
   )
 }
 
+// ─── Groq Logo Badge ───────────────────────────────────────────
+function GroqBadge({ size = 28 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: '#000000',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7" stroke="#F55036" strokeWidth="2.5"/>
+        <circle cx="10" cy="10" r="3" fill="#F55036"/>
+      </svg>
+    </div>
+  )
+}
+
 // ─── Message Bubble ────────────────────────────────────────────
 function Bubble({ role, content }) {
   const isUser = role === 'user'
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
       {!isUser && (
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: '#4285F4', color: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 700, flexShrink: 0,
-          marginRight: 8, marginTop: 2, fontFamily: "'Syne',sans-serif",
-        }}>G</div>
+        <div style={{ marginRight: 8, marginTop: 2, flexShrink: 0 }}>
+          <GroqBadge size={28}/>
+        </div>
       )}
       <div style={{
         maxWidth: isUser ? '70%' : '80%',
@@ -160,13 +174,16 @@ export default function AIAnalysisPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
-  // ── Send (Gemini API) ─────────────────────────────────────────
+  // ── Send (Groq API / OpenAI互換) ─────────────────────────────
   async function sendMessage(text) {
     const trimmed = (text ?? input).trim()
     if (!trimmed || isLoading) return
 
     if (!API_KEY) {
-      setError('APIキーが未設定です。.env.local に VITE_GEMINI_API_KEY を設定してください。')
+      setError(
+        'APIキーが未設定です。.env.local に VITE_GROQ_API_KEY を設定してください。\n' +
+        '→ https://console.groq.com でGoogleアカウントから無料取得できます（クレカ不要）'
+      )
       return
     }
 
@@ -177,12 +194,6 @@ export default function AIAnalysisPage() {
     setIsLoading(true)
     setError(null)
 
-    // Gemini形式に変換（role: user → user, assistant → model）
-    const geminiContents = newHistory.map(m => ({
-      role:  m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }))
-
     const systemPrompt = SYSTEM_PROMPT.replace(
       '{{HOLDINGS_JSON}}',
       holdings.length > 0
@@ -190,24 +201,29 @@ export default function AIAnalysisPage() {
         : '（保有銘柄なし：マイPF設定ページで登録してください）'
     )
 
+    // Groq用メッセージ配列（system + 会話履歴）
+    const groqMessages = [
+      { role: 'system', content: systemPrompt },
+      ...newHistory.map(m => ({
+        role:    m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      })),
+    ]
+
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
-        {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: systemPrompt }],
-            },
-            contents: geminiContents,
-            generationConfig: {
-              temperature:      0.7,
-              maxOutputTokens:  1024,
-            },
-          }),
-        }
-      )
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${API_KEY}`,
+        },
+        body: JSON.stringify({
+          model:       'llama-3.3-70b-versatile',
+          messages:    groqMessages,
+          temperature: 0.7,
+          max_tokens:  1024,
+        }),
+      })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -215,7 +231,7 @@ export default function AIAnalysisPage() {
       }
 
       const data  = await res.json()
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
+      const reply = data.choices?.[0]?.message?.content
         ?? '応答を取得できませんでした'
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
@@ -240,27 +256,20 @@ export default function AIAnalysisPage() {
 
         {/* ── Header ────────────────────────────────────────── */}
         <div style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            {/* Gemini "G" badge */}
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4285F4 0%, #34A853 33%, #FBBC05 66%, #EA4335 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, fontWeight: 900, color: '#fff',
-              flexShrink: 0,
-            }}>G</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <GroqBadge size={36}/>
             <div>
               <h1 style={{
                 fontFamily: "'Syne',sans-serif", fontWeight: 700,
                 fontSize: 18, color: C.ink, margin: 0,
               }}>
-                Gemini 分身 — 投資分析AI
+                Llama 分身 — 投資分析AI
               </h1>
               <div style={{
                 fontFamily: "'DM Mono',monospace", fontSize: 11,
                 color: C.muted, marginTop: 2,
               }}>
-                モデル: Gemini 2.0 Flash（Google・完全無料）&nbsp;|&nbsp;
+                モデル: Llama 3.3 70B（Groq・完全無料）&nbsp;|&nbsp;
                 保有銘柄: {holdings.length > 0
                   ? `${holdings.length}銘柄を認識中`
                   : '未登録（マイPF設定で追加）'}
@@ -283,19 +292,19 @@ export default function AIAnalysisPage() {
             }}>
               ⚠ <strong>.env.local</strong> に{' '}
               <code style={{ background: '#FFF0B0', padding: '1px 4px', borderRadius: 3 }}>
-                VITE_GEMINI_API_KEY=AIzaSy...
+                VITE_GROQ_API_KEY=gsk_...
               </code>{' '}
               を設定してください。<br/>
               →{' '}
               <a
-                href="https://aistudio.google.com/"
+                href="https://console.groq.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: '#4285F4', textDecoration: 'underline' }}
+                style={{ color: C.groq, textDecoration: 'underline' }}
               >
-                https://aistudio.google.com/
+                https://console.groq.com
               </a>{' '}
-              でGoogleアカウントから無料取得できます
+              でGoogleアカウントから無料取得できます（クレカ不要）
             </div>
           )}
         </div>
@@ -353,12 +362,7 @@ export default function AIAnalysisPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               height: 360, flexDirection: 'column', gap: 12,
             }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #4285F4 0%, #34A853 33%, #FBBC05 66%, #EA4335 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 26, fontWeight: 900, color: '#fff',
-              }}>G</div>
+              <GroqBadge size={56}/>
               <div style={{
                 fontFamily: "'Syne',sans-serif", fontSize: 13,
                 color: C.muted, textAlign: 'center',
@@ -375,13 +379,9 @@ export default function AIAnalysisPage() {
               {/* Loading bubble */}
               {isLoading && (
                 <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: '#4285F4', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 700, flexShrink: 0,
-                    marginRight: 8, marginTop: 2,
-                  }}>G</div>
+                  <div style={{ marginRight: 8, marginTop: 2 }}>
+                    <GroqBadge size={28}/>
+                  </div>
                   <div style={{
                     background: C.card,
                     border: `0.5px solid rgba(26,26,46,0.1)`,
@@ -409,6 +409,7 @@ export default function AIAnalysisPage() {
             fontSize: 12,
             color: '#712B13',
             marginBottom: 10,
+            whiteSpace: 'pre-wrap',
           }}>
             {error}
           </div>
@@ -483,18 +484,18 @@ export default function AIAnalysisPage() {
         {/* ── Tip ───────────────────────────────────────────── */}
         <div style={{
           marginTop: 24, padding: '11px 16px',
-          background: 'rgba(66,133,244,0.06)',
-          border: '1px solid rgba(66,133,244,0.2)',
+          background: 'rgba(245,80,54,0.05)',
+          border: '1px solid rgba(245,80,54,0.2)',
           borderRadius: 10,
           fontFamily: "'DM Mono',monospace", fontSize: 11,
-          color: '#1A3A7A', lineHeight: 1.8,
+          color: '#5A1A0A', lineHeight: 1.8,
         }}>
           📋 APIキーの設定: プロジェクトルートの <strong>.env.local</strong> に
           &nbsp;
-          <code style={{ background: 'rgba(66,133,244,0.1)', padding: '1px 5px', borderRadius: 3 }}>
-            VITE_GEMINI_API_KEY=AIzaSy...
+          <code style={{ background: 'rgba(245,80,54,0.1)', padding: '1px 5px', borderRadius: 3 }}>
+            VITE_GROQ_API_KEY=gsk_...
           </code>
-          &nbsp;を記載 → <code>npm run dev</code> を再起動してください（Gitには含まれません）
+          &nbsp;を記載 → <code>npm run dev</code> を再起動（Gitには含まれません）
         </div>
       </div>
     </div>
