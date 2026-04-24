@@ -1,0 +1,24 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --gold: #C9A84C;
+  --gold-lt: #F5EDD5;
+  --ink: #1A1A2E;
+  --muted: rgba(26,26,46,0.45);
+  --up: #0F6E56;
+  --up-bg: #E1F5EE;
+  --dn: #993C1D;
+  --dn-bg: #FAECE7;
+  font-family: 'Syne', sans-serif;
+  background: #F8F7F4;
+  color: #1A1A2E;
+}
+
+body {
+  min-height: 100vh;
+  background: #F8F7F4;
+}
