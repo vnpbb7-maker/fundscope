@@ -2,6 +2,7 @@ import { useState } from 'react'
 import TrendPage from './pages/TrendPage'
 import RankingPage from './pages/RankingPage'
 import PortfolioSettingsPage from './pages/PortfolioSettingsPage'
+import AIAnalysisPage from './pages/AIAnalysisPage'
 
 const TABS = [
   { id: 'ranking',   label: 'ランキング' },
@@ -78,18 +79,7 @@ export default function App() {
       {active === 'ranking'   && <RankingPage />}
       {active === 'trend'     && <TrendPage />}
       {active === 'portfolio' && <PortfolioSettingsPage />}
-      {active === 'ai' && (
-        <div style={{
-          textAlign: 'center',
-          padding: '80px 24px',
-          color: '#8C8C8C',
-          fontFamily: "'DM Mono', monospace",
-          fontSize: '13px',
-          letterSpacing: '0.03em',
-        }}>
-          ✦ AI分析ページは近日公開予定
-        </div>
-      )}
+      {active === 'ai' && <AIAnalysisPage />}
     </div>
   )
 }
