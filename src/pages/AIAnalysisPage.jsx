@@ -1,3 +1,14 @@
+// ─── Gemini APIキー取得手順 ────────────────────────────────────
+// 1. https://aistudio.google.com/ にGoogleアカウントでアクセス
+// 2. 左メニュー「Get API key」→「Create API key」
+// 3. 発行されたキーを .env.local に保存:
+//    VITE_GEMINI_API_KEY=AIzaSy...
+// 4. npm run dev を再起動
+//
+// .env.local に以下を追記（ANTHROPIC_API_KEYの行は削除してOK）:
+// VITE_GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// ──────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useRef } from 'react'
 
 // ─── Color Tokens ─────────────────────────────────────────────
@@ -16,8 +27,9 @@ const C = {
   subtle:    '#4A4A5A',
 }
 
-// ─── API Key ────────────────────────────────────────────────────
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
+// ─── API Key (Gemini) ──────────────────────────────────────────
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`
 
 // ─── System Prompt ─────────────────────────────────────────────
 const SYSTEM_PROMPT = `
@@ -58,18 +70,20 @@ function LoadingDots() {
           0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
           40%            { opacity: 1;   transform: scale(1);   }
         }
-        .dot { display: inline-block; width: 6px; height: 6px;
+        .dot {
+          display: inline-block; width: 6px; height: 6px;
           border-radius: 50%; background: #8C8C8C; margin: 0 2px;
-          animation: dotPulse 1.4s ease-in-out infinite both; }
-        .dot:nth-child(1) { animation-delay: 0s;   }
+          animation: dotPulse 1.4s ease-in-out infinite both;
+        }
+        .dot:nth-child(1) { animation-delay: 0s;    }
         .dot:nth-child(2) { animation-delay: 0.16s; }
         .dot:nth-child(3) { animation-delay: 0.32s; }
       `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0' }}>
-        <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 12, color: C.muted, marginRight: 4 }}>分析中</span>
-        <span className="dot"/>
-        <span className="dot"/>
-        <span className="dot"/>
+        <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 12, color: C.muted, marginRight: 4 }}>
+          分析中
+        </span>
+        <span className="dot"/><span className="dot"/><span className="dot"/>
       </div>
     </>
   )
@@ -79,21 +93,15 @@ function LoadingDots() {
 function Bubble({ role, content }) {
   const isUser = role === 'user'
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom: 12,
-    }}>
-      {/* アシスタントアイコン */}
+    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
       {!isUser && (
         <div style={{
           width: 28, height: 28, borderRadius: '50%',
-          background: C.gold, color: C.ink,
+          background: '#4285F4', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 700, flexShrink: 0,
-          marginRight: 8, marginTop: 2,
-          fontFamily: "'Syne',sans-serif",
-        }}>AI</div>
+          fontSize: 11, fontWeight: 700, flexShrink: 0,
+          marginRight: 8, marginTop: 2, fontFamily: "'Syne',sans-serif",
+        }}>G</div>
       )}
       <div style={{
         maxWidth: isUser ? '70%' : '80%',
@@ -111,15 +119,13 @@ function Bubble({ role, content }) {
       }}>
         {content}
       </div>
-      {/* ユーザーアイコン */}
       {isUser && (
         <div style={{
           width: 28, height: 28, borderRadius: '50%',
           background: C.ink, color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, flexShrink: 0,
-          marginLeft: 8, marginTop: 2,
-          fontFamily: "'Syne',sans-serif",
+          marginLeft: 8, marginTop: 2, fontFamily: "'Syne',sans-serif",
         }}>You</div>
       )}
     </div>
@@ -133,7 +139,7 @@ export default function AIAnalysisPage() {
   const [isLoading,  setIsLoading ] = useState(false)
   const [holdings,   setHoldings  ] = useState([])
   const [error,      setError     ] = useState(null)
-  const bottomRef  = useRef(null)
+  const bottomRef   = useRef(null)
   const textareaRef = useRef(null)
 
   // localStorage から保有銘柄を読み込み
@@ -154,13 +160,13 @@ export default function AIAnalysisPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
-  // ── Send ──────────────────────────────────────────────────────
+  // ── Send (Gemini API) ─────────────────────────────────────────
   async function sendMessage(text) {
     const trimmed = (text ?? input).trim()
     if (!trimmed || isLoading) return
 
     if (!API_KEY) {
-      setError('.env.local に VITE_ANTHROPIC_API_KEY を設定してください。')
+      setError('APIキーが未設定です。.env.local に VITE_GEMINI_API_KEY を設定してください。')
       return
     }
 
@@ -171,7 +177,12 @@ export default function AIAnalysisPage() {
     setIsLoading(true)
     setError(null)
 
-    // ポートフォリオ情報をシステムプロンプトに注入
+    // Gemini形式に変換（role: user → user, assistant → model）
+    const geminiContents = newHistory.map(m => ({
+      role:  m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }))
+
     const systemPrompt = SYSTEM_PROMPT.replace(
       '{{HOLDINGS_JSON}}',
       holdings.length > 0
@@ -180,21 +191,23 @@ export default function AIAnalysisPage() {
     )
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'x-api-key':     API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model:      'claude-opus-4-5',
-          max_tokens: 1024,
-          system:     systemPrompt,
-          messages:   newHistory,
-        }),
-      })
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: systemPrompt }],
+            },
+            contents: geminiContents,
+            generationConfig: {
+              temperature:      0.7,
+              maxOutputTokens:  1024,
+            },
+          }),
+        }
+      )
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -202,14 +215,14 @@ export default function AIAnalysisPage() {
       }
 
       const data  = await res.json()
-      const reply = data.content?.[0]?.text ?? '応答を取得できませんでした'
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
+        ?? '応答を取得できませんでした'
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (e) {
       setError(`エラー: ${e.message}`)
     } finally {
       setIsLoading(false)
-      // フォーカスを入力欄に戻す
       setTimeout(() => textareaRef.current?.focus(), 50)
     }
   }
@@ -228,25 +241,29 @@ export default function AIAnalysisPage() {
         {/* ── Header ────────────────────────────────────────── */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            {/* Gemini "G" badge */}
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: C.gold, color: C.ink,
+              background: 'linear-gradient(135deg, #4285F4 0%, #34A853 33%, #FBBC05 66%, #EA4335 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, fontWeight: 800,
-            }}>AI</div>
+              fontSize: 16, fontWeight: 900, color: '#fff',
+              flexShrink: 0,
+            }}>G</div>
             <div>
               <h1 style={{
                 fontFamily: "'Syne',sans-serif", fontWeight: 700,
                 fontSize: 18, color: C.ink, margin: 0,
               }}>
-                Claude 分身 — 投資分析AI
+                Gemini 分身 — 投資分析AI
               </h1>
               <div style={{
                 fontFamily: "'DM Mono',monospace", fontSize: 11,
                 color: C.muted, marginTop: 2,
               }}>
-                モデル: claude-opus-4-5 &nbsp;|&nbsp;
-                保有銘柄: {holdings.length > 0 ? `${holdings.length}銘柄を認識中` : '未登録（マイPF設定で追加）'}
+                モデル: Gemini 2.0 Flash（Google・完全無料）&nbsp;|&nbsp;
+                保有銘柄: {holdings.length > 0
+                  ? `${holdings.length}銘柄を認識中`
+                  : '未登録（マイPF設定で追加）'}
               </div>
             </div>
           </div>
@@ -262,19 +279,30 @@ export default function AIAnalysisPage() {
               fontSize: 12,
               color: '#7A5A00',
               marginTop: 12,
+              lineHeight: 1.7,
             }}>
-              ⚠ <strong>.env.local</strong> に <code style={{ background: '#FFF0B0', padding: '1px 4px', borderRadius: 3 }}>VITE_ANTHROPIC_API_KEY=sk-ant-xxxx</code> を設定してください。
-              設定後に開発サーバーを再起動すると有効になります。
+              ⚠ <strong>.env.local</strong> に{' '}
+              <code style={{ background: '#FFF0B0', padding: '1px 4px', borderRadius: 3 }}>
+                VITE_GEMINI_API_KEY=AIzaSy...
+              </code>{' '}
+              を設定してください。<br/>
+              →{' '}
+              <a
+                href="https://aistudio.google.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#4285F4', textDecoration: 'underline' }}
+              >
+                https://aistudio.google.com/
+              </a>{' '}
+              でGoogleアカウントから無料取得できます
             </div>
           )}
         </div>
 
         {/* ── Suggest Buttons (初回のみ) ─────────────────────── */}
         {messages.length === 0 && (
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr',
-            gap: 10, marginBottom: 24,
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
             {SUGGESTS.map(q => (
               <button
                 key={q}
@@ -327,10 +355,10 @@ export default function AIAnalysisPage() {
             }}>
               <div style={{
                 width: 56, height: 56, borderRadius: '50%',
-                background: C.goldLight,
+                background: 'linear-gradient(135deg, #4285F4 0%, #34A853 33%, #FBBC05 66%, #EA4335 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 24,
-              }}>✦</div>
+                fontSize: 26, fontWeight: 900, color: '#fff',
+              }}>G</div>
               <div style={{
                 fontFamily: "'Syne',sans-serif", fontSize: 13,
                 color: C.muted, textAlign: 'center',
@@ -349,12 +377,11 @@ export default function AIAnalysisPage() {
                 <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%',
-                    background: C.gold, color: C.ink,
+                    background: '#4285F4', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 700, flexShrink: 0,
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
                     marginRight: 8, marginTop: 2,
-                    fontFamily: "'Syne',sans-serif",
-                  }}>AI</div>
+                  }}>G</div>
                   <div style={{
                     background: C.card,
                     border: `0.5px solid rgba(26,26,46,0.1)`,
@@ -366,7 +393,6 @@ export default function AIAnalysisPage() {
                   </div>
                 </div>
               )}
-
               <div ref={bottomRef}/>
             </>
           )}
@@ -439,7 +465,7 @@ export default function AIAnalysisPage() {
           </button>
         </div>
 
-        {/* リセット */}
+        {/* ── Reset ─────────────────────────────────────────── */}
         <div style={{ textAlign: 'center', marginTop: 10 }}>
           <button
             onClick={resetChat}
@@ -454,22 +480,21 @@ export default function AIAnalysisPage() {
           </button>
         </div>
 
-        {/* ── .env.local tip ──────────────────────────────── */}
+        {/* ── Tip ───────────────────────────────────────────── */}
         <div style={{
           marginTop: 24, padding: '11px 16px',
-          background: 'rgba(201,168,76,0.07)',
-          border: '1px solid rgba(201,168,76,0.25)',
+          background: 'rgba(66,133,244,0.06)',
+          border: '1px solid rgba(66,133,244,0.2)',
           borderRadius: 10,
           fontFamily: "'DM Mono',monospace", fontSize: 11,
-          color: C.goldText, lineHeight: 1.8,
+          color: '#1A3A7A', lineHeight: 1.8,
         }}>
-          {/* プロジェクトルートに .env.local を作成: */}
-          {/* VITE_ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxx */}
-          {/* ※このファイルは .gitignore に含まれているのでGitHubには上げられません */}
-          {/* ※GitHub Pages公開版では Secrets 経由でビルド時に注入されます */}
           📋 APIキーの設定: プロジェクトルートの <strong>.env.local</strong> に
-          &nbsp;<code style={{ background: C.goldLight, padding: '1px 5px', borderRadius: 3 }}>VITE_ANTHROPIC_API_KEY=sk-ant-xxxx</code>&nbsp;
-          を記載してください（Gitには含まれません）
+          &nbsp;
+          <code style={{ background: 'rgba(66,133,244,0.1)', padding: '1px 5px', borderRadius: 3 }}>
+            VITE_GEMINI_API_KEY=AIzaSy...
+          </code>
+          &nbsp;を記載 → <code>npm run dev</code> を再起動してください（Gitには含まれません）
         </div>
       </div>
     </div>
