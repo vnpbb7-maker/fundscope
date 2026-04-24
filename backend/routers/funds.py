@@ -54,12 +54,12 @@ FUND_MASTER = [
     {"id": 43, "shortName": "1478 高配当",  "ticker": "1478",  "type": "tse_etf", "category": "日本株",             "fee": "0.209%", "reason": "MSCIジャパン高配当・安定配当企業に絞った投資",          "isOwned": False},
     {"id": 44, "shortName": "2513 外国株",  "ticker": "2513",  "type": "tse_etf", "category": "全世界・先進国",     "fee": "0.187%", "reason": "東証上場外国株ETF・低コストで先進国株に投資可能",       "isOwned": False},
     {"id": 45, "shortName": "1482 米中期債","ticker": "1482",  "type": "tse_etf", "category": "債券・REIT",         "fee": "0.132%", "reason": "米国債7-10年連動・金利低下局面でのリターン期待",       "isOwned": False},
-    # ── 国内投信 (ISINコード) ──
-    {"id": 46, "shortName": "eMAXIS AC",       "isin": "JP90C000H8Y5", "type": "jp_fund", "category": "全世界・先進国",   "fee": "0.058%", "reason": "円安進行＋先進国株高・低コストが長期積立に有利",      "isOwned": True},
-    {"id": 47, "shortName": "SBI S&P500",      "isin": "JP90C000K7W7", "type": "jp_fund", "category": "全世界・先進国",   "fee": "0.094%", "reason": "米国企業業績好調・Fed利下げ期待で株高継続",           "isOwned": True},
-    {"id": 48, "shortName": "ニッセイ外国株",  "isin": "JP90C000E095", "type": "jp_fund", "category": "全世界・先進国",   "fee": "0.094%", "reason": "先進国株式全般に恩恵・低コスト（0.094%）が強み",      "isOwned": True},
-    {"id": 49, "shortName": "ニッセイTOPIX",  "isin": "JP90C000E012", "type": "jp_fund", "category": "日本株",           "fee": "0.143%", "reason": "国内景気回復・日銀政策正常化で日本株見直し買い",      "isOwned": True},
-    {"id": 50, "shortName": "はじめてAC",      "isin": "JP90C000S8C7", "type": "jp_fund", "category": "全世界・先進国",   "fee": "0.058%", "reason": "全世界株式・NISA成長投資枠で月1万円から積立",        "isOwned": True},
+    # ── 国内投信 → 代替東証ETFで取得 ──
+    {"id": 46, "shortName": "eMAXIS AC",     "ticker": "2559", "type": "tse_etf", "category": "全世界・先進国", "fee": "0.058%", "reason": "円安進行＋先進国株高・低コストが長期積立に有利", "isOwned": True},
+    {"id": 47, "shortName": "SBI S&P500",    "ticker": "2563", "type": "tse_etf", "category": "全世界・先進国", "fee": "0.094%", "reason": "米国企業業績好調・Fed利下げ期待で株高継続",        "isOwned": True},
+    {"id": 48, "shortName": "ニッセイ外国株","ticker": "1550", "type": "tse_etf", "category": "全世界・先進国", "fee": "0.094%", "reason": "先進国株式全般に恩恵・低コスト（0.094%）が強み",   "isOwned": True},
+    {"id": 49, "shortName": "ニッセイTOPIX","ticker": "1306", "type": "tse_etf", "category": "日本株",         "fee": "0.143%", "reason": "国内景気回復・日銀政策正常化で日本株見直し買い",   "isOwned": True},
+    {"id": 50, "shortName": "はじめてAC",    "ticker": "2559", "type": "tse_etf", "category": "全世界・先進国", "fee": "0.058%", "reason": "全世界株式・NISA成長投資枠で月1万円から積立",      "isOwned": True},
 ]
 
 
@@ -82,11 +82,12 @@ async def _enrich(fund: dict, usd_jpy: float, period: str) -> dict:
         f["change"]        = data.get("changes", {}).get(period, 0.0)
 
     elif f["type"] == "jp_fund":
-        data = await fetch_jp_fund(f.get("isin", ""))
-        f["price_jpy"]     = data.get("price_jpy")
-        chg_1d             = data.get("change_1d_pct", 0.0)
-        f["changes"]       = {k: chg_1d for k in ["1D","1W","1M","3M","6M","YTD","1Y"]}
-        f["change"]        = chg_1d
+        # fetch_jp_fund は現在 fetch_us_etf に委譲しているため sync
+        data = fetch_jp_fund(f.get("ticker", ""))
+        # 東証ETF代替なので price_usd フィールドが円価格
+        f["price_jpy"]     = int(data["price_usd"]) if data.get("price_usd") else None
+        f["changes"]       = data.get("changes", {})
+        f["change"]        = data.get("changes", {}).get(period, 0.0)
 
     # 表示用価格文字列
     f["price_display"] = (

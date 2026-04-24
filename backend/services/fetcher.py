@@ -114,44 +114,12 @@ def fetch_tse_etf(ticker: str) -> dict:
     return result
 
 
-# ── 国内投信 基準価額取得（投資信託協会ウェブ scraping） ──────────
-async def fetch_jp_fund(isin: str) -> dict:
+# ── 国内投信 → 代替ETFで取得（yfinance .T suffix） ──────────────
+def fetch_jp_fund(fund_code: str) -> dict:
     """
-    投資信託協会の FDST 検索ページから基準価額を取得する。
-    isin: JP で始まる ISINコード（例: JP90C000H8Y5）
+    国内投信は yfinance で代替ETFのデータを取得する。
+    fund_code = 代替ETFのティッカー（.T付き）
+    例: "2559.T" → MAXIS全世界株式(AC)
+    fetch_us_etf は .T 付きティッカーも対応済み。
     """
-    cached = cache.get(f"jpfund_{isin}")
-    if cached is not None:
-        return cached
-
-    result: dict = {"isin": isin}
-    try:
-        url = f"https://toushin-lib.fwg.ne.jp/FdsWeb/FDST999999?isinCd={isin}"
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-            res = await client.get(url)
-            text = res.text
-
-        # 基準価額: "12,345 円" パターン
-        m_price = re.search(r"基準価額[^0-9]*([0-9,]+)\s*円", text)
-        price = int(m_price.group(1).replace(",", "")) if m_price else None
-
-        # 前日比（円）: △▼ 記号または signed int
-        m_chg = re.search(r"前日比[^0-9△▲▼\-]*([△▲▼\-]?)\s*([0-9,]+)", text)
-        change_jpy = 0.0
-        if m_chg:
-            sign = -1 if m_chg.group(1) in ("▼", "-") else 1
-            change_jpy = sign * float(m_chg.group(2).replace(",", ""))
-
-        result = {
-            "isin": isin,
-            "price_jpy": price,
-            "change_1d_jpy": change_jpy,
-            "change_1d_pct": (
-                round(change_jpy / price * 100, 2) if price else 0.0
-            ),
-        }
-    except Exception as e:
-        result["error"] = str(e)
-
-    cache.set(f"jpfund_{isin}", result, ttl_seconds=3600)  # 1時間
-    return result
+    return fetch_us_etf(fund_code)

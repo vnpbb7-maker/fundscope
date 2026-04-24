@@ -79,6 +79,20 @@ function feeColor(feeStr) {
   return C.down
 }
 
+// ─── SBI証券リンク生成 ──────────────────────────────
+function getSbiUrl(fund) {
+  if (fund.type === 'us_etf') {
+    return `https://search.sbisec.co.jp/v2/popwin/info/stock/pop6040_foreign.html?sec_id=${fund.ticker}&exchange=NSD`
+  }
+  if (fund.type === 'tse_etf') {
+    return `https://finance.yahoo.co.jp/quote/${fund.ticker}.T`
+  }
+  if (fund.type === 'jp_fund' && fund.isin) {
+    return `https://site0.sbisec.co.jp/marble/fund/detail/achievement.do?Isin=${fund.isin}`
+  }
+  return null
+}
+
 const fmtPct   = v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 const pctColor = v => v >= 0 ? C.up   : C.down
 const pctBg    = v => v >= 0 ? C.upBg : C.downBg
@@ -350,6 +364,12 @@ export default function TrendPage() {
 
                 return (
                   <div key={fund.id || idx}
+                    onClick={() => {
+                      const url = getSbiUrl(fund)
+                      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = fund.isOwned ? '#EDE5C4' : '#F0EFEC'}
+                    onMouseLeave={e => e.currentTarget.style.background = fund.isOwned ? C.goldLight : C.card}
                     style={{ display:'grid', gridTemplateColumns:COL,
                       padding:'12px 20px', gap:12, alignItems:'center',
                       background:fund.isOwned ? C.goldLight : C.card,
@@ -363,6 +383,7 @@ export default function TrendPage() {
                           color:C.ink, whiteSpace:'nowrap' }}>
                           {fund.shortName}
                         </span>
+                        <span style={{ fontSize:10, color:C.gold, opacity:0.8 }}>↗</span>
                         {fund.ticker && (
                           <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:C.muted }}>
                             {fund.ticker}
