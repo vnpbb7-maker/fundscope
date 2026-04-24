@@ -131,6 +131,27 @@ function getSbiUrl(fund) {
   return null
 }
 
+// ─── NISAバッジ ──────────────────────────────────────────────
+const NISA_STYLES = {
+  '成長':   { bg: '#E6F1FB', color: '#0C447C', label: 'NISA成長' },
+  'つみたて': { bg: '#E1F5EE', color: '#085041', label: 'NISAつみたて' },
+  '両方':   { bg: '#F5EDD5', color: '#7A5A10', label: 'NISA両枠' },
+}
+function getNisaBadge(nisa) {
+  if (!nisa) return null
+  const s = NISA_STYLES[nisa]
+  if (!s) return null
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600,
+      padding: '2px 7px', borderRadius: 6,
+      background: s.bg, color: s.color,
+      whiteSpace: 'nowrap', letterSpacing: '0.3px',
+      fontFamily: "'Syne',sans-serif",
+    }}>{s.label}</span>
+  )
+}
+
 // ─── Sub-components ────────────────────────────────────────────
 function OwnedBadge() {
   return (
@@ -363,7 +384,7 @@ export default function RankingPage() {
                 background:'#F3F1EC', borderBottom:`1px solid ${C.border}`, gap:12, alignItems:'end' }}>
                 {[
                   { label:'#' },
-                  { label:'ファンド名' },
+                  { label:'ファンド名 / NISA区分' },
                   { label:`上昇率（${period}）`, center:true },
                   { label:'基準価額（円）', sub:`1USD=¥${usdJpy.toFixed(1)}換算`, center:true },
                   { label:'信託報酬（年率）', center:true },
@@ -412,27 +433,29 @@ export default function RankingPage() {
                     </div>
 
                     {/* name + reason + tags */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:3, minWidth:0 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
-                        <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:600, fontSize:13,
-                          color:C.ink, whiteSpace:'nowrap' }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                        <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:600, fontSize:14,
+                          color:C.ink, letterSpacing:'-0.2px', whiteSpace:'nowrap' }}>
                           {fund.shortName}
                         </span>
                         <span style={{ fontSize:10, color:C.gold, opacity:0.8 }}>↗</span>
                         {fund.ticker && fund.ticker !== '—' && (
-                          <span style={{ fontFamily:"'DM Mono',monospace", fontWeight:400,
-                            fontSize:11, color:subCol }}>({fund.ticker})</span>
+                          <span style={{ fontFamily:"'DM Mono',monospace",
+                            fontSize:11, color:'#888' }}>{fund.ticker}</span>
                         )}
+                        {getNisaBadge(fund.nisa)}
+                        {fund.isOwned && <OwnedBadge/>}
                       </div>
                       {fund.reason && (
-                        <div style={{ fontSize:11, color:reasonColor, fontStyle:'italic',
-                          marginTop:1, lineHeight:1.5 }}>
+                        <div style={{ fontSize:12,
+                          color:fund.isOwned ? '#3A3A4E' : '#5A5A6A',
+                          marginTop:4, lineHeight:1.5 }}>
                           {fund.reason}
                         </div>
                       )}
-                      <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:1 }}>
+                      <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:2 }}>
                         <RankCatTag label={fund.category}/>
-                        {fund.isOwned && <OwnedBadge/>}
                       </div>
                     </div>
 

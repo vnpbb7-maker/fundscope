@@ -93,6 +93,27 @@ function getSbiUrl(fund) {
   return null
 }
 
+// ─── NISAバッジ ────────────────────────────────────────────
+const NISA_STYLES = {
+  '成長':   { bg: '#E6F1FB', color: '#0C447C', label: 'NISA成長' },
+  'つみたて': { bg: '#E1F5EE', color: '#085041', label: 'NISAつみたて' },
+  '両方':   { bg: '#F5EDD5', color: '#7A5A10', label: 'NISA両枠' },
+}
+function getNisaBadge(nisa) {
+  if (!nisa) return null
+  const s = NISA_STYLES[nisa]
+  if (!s) return null
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600,
+      padding: '2px 7px', borderRadius: 6,
+      background: s.bg, color: s.color,
+      whiteSpace: 'nowrap', letterSpacing: '0.3px',
+      fontFamily: "'Syne',sans-serif",
+    }}>{s.label}</span>
+  )
+}
+
 const fmtPct   = v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 const pctColor = v => v >= 0 ? C.up   : C.down
 const pctBg    = v => v >= 0 ? C.upBg : C.downBg
