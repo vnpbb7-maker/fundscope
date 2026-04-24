@@ -47,16 +47,16 @@ const TAG_STYLE = {
 }
 
 const FUNDS = [
-  { rank:1,  owned:false, name:'iShares Semiconductor ETF',      ticker:'SOXX', tag:'AI・半導体',  pct:5.24, price:'$248.60', barW:100, vol:'3.2×' },
-  { rank:2,  owned:false, name:'Global X AI & Technology ETF',   ticker:'AIQ',  tag:'AI・半導体',  pct:4.73, price:'$32.14',  barW:90,  vol:'2.8×' },
-  { rank:3,  owned:false, name:'VanEck Defense ETF',             ticker:'DFND', tag:'防衛・地政学', pct:4.18, price:'$41.88',  barW:80,  vol:'4.1×' },
-  { rank:4,  owned:true,  name:'eMAXIS Slim 全世界株（AC）',      ticker:'—',    tag:'全世界',      pct:3.61, price:'¥28,440', barW:69,  vol:null   },
-  { rank:5,  owned:true,  name:'SBI・V・S&P500インデックスF',     ticker:'—',    tag:'米国',        pct:3.44, price:'¥31,220', barW:66,  vol:null   },
-  { rank:6,  owned:true,  name:'ニッセイ外国株式インデックスF',    ticker:'—',    tag:'先進国',      pct:3.31, price:'¥58,110', barW:63,  vol:null   },
-  { rank:7,  owned:false, name:'WisdomTree India Earnings ETF',  ticker:'EPI',  tag:'インド',      pct:2.94, price:'$34.72',  barW:56,  vol:'2.1×' },
-  { rank:8,  owned:true,  name:'NEXT FUNDS TOPIX ETF',           ticker:'412A', tag:'日本株',      pct:2.41, price:'¥2,521',  barW:46,  vol:null   },
-  { rank:9,  owned:true,  name:'ニッセイTOPIXインデックスF',       ticker:'—',    tag:'日本株',      pct:2.18, price:'¥18,840', barW:42,  vol:null   },
-  { rank:10, owned:false, name:'SPDR Gold Shares ETF',           ticker:'GLD',  tag:'コモディティ', pct:1.82, price:'$218.40', barW:35,  vol:'0.9×' },
+  { rank:1,  owned:false, name:'iShares Semiconductor ETF',      ticker:'SOXX', tag:'AI・半導体',  pct:5.24, price:'$248.60', fee:'0.350%', vol:'3.2×' },
+  { rank:2,  owned:false, name:'Global X AI & Technology ETF',   ticker:'AIQ',  tag:'AI・半導体',  pct:4.73, price:'$32.14',  fee:'0.680%', vol:'2.8×' },
+  { rank:3,  owned:false, name:'VanEck Defense ETF',             ticker:'DFND', tag:'防衛・地政学', pct:4.18, price:'$41.88',  fee:'0.550%', vol:'4.1×' },
+  { rank:4,  owned:true,  name:'eMAXIS Slim 全世界株（AC）',      ticker:'—',    tag:'全世界',      pct:3.61, price:'¥28,440', fee:'0.058%', vol:null   },
+  { rank:5,  owned:true,  name:'SBI・V・S&P500インデックスF',     ticker:'—',    tag:'米国',        pct:3.44, price:'¥31,220', fee:'0.094%', vol:null   },
+  { rank:6,  owned:true,  name:'ニッセイ外国株式インデックスF',    ticker:'—',    tag:'先進国',      pct:3.31, price:'¥58,110', fee:'0.094%', vol:null   },
+  { rank:7,  owned:false, name:'WisdomTree India Earnings ETF',  ticker:'EPI',  tag:'インド',      pct:2.94, price:'$34.72',  fee:'0.850%', vol:'2.1×' },
+  { rank:8,  owned:true,  name:'NEXT FUNDS TOPIX ETF',           ticker:'412A', tag:'日本株',      pct:2.41, price:'¥2,521',  fee:'0.078%', vol:null   },
+  { rank:9,  owned:true,  name:'ニッセイTOPIXインデックスF',       ticker:'—',    tag:'日本株',      pct:2.18, price:'¥18,840', fee:'0.143%', vol:null   },
+  { rank:10, owned:false, name:'SPDR Gold Shares ETF',           ticker:'GLD',  tag:'コモディティ', pct:1.82, price:'$218.40', fee:'0.400%', vol:'0.9×' },
 ]
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -97,13 +97,12 @@ function RankCatTag({ label }) {
   )
 }
 
-function TondrakuBar({ widthPct, positive }) {
-  return (
-    <div style={{ width:100, height:6, background:'rgba(0,0,0,0.07)', borderRadius:3, overflow:'hidden' }}>
-      <div style={{ width:`${widthPct}%`, height:'100%',
-        background:positive?C.up:C.down, borderRadius:3, transition:'width .6s ease' }}/>
-    </div>
-  )
+// feeColor: 低コスト(<0.1%) 緑 / 中(0.1-0.5%) 黒 / 高(>0.5%) 赤
+function feeColor(feeStr) {
+  const v = parseFloat(feeStr)
+  if (v < 0.1)  return C.up
+  if (v <= 0.5) return C.ink
+  return C.down
 }
 
 function SummaryCard({ label, value, sub, valueColor }) {
@@ -121,7 +120,7 @@ function SummaryCard({ label, value, sub, valueColor }) {
   )
 }
 
-const COL = '28px 2.6fr 90px 90px 120px 60px 56px'
+const COL = '32px 1fr 90px 80px 80px 70px 52px'
 
 // ─── RankingPage ───────────────────────────────────────────────
 export default function RankingPage() {
@@ -204,7 +203,7 @@ export default function RankingPage() {
             {/* head */}
             <div style={{ display:'grid', gridTemplateColumns:COL, padding:'10px 20px',
               background:'#F3F1EC', borderBottom:`1px solid ${C.border}`, gap:12, alignItems:'center' }}>
-              {['#','ファンド名','上昇率','基準価額','騰落バー','出来高比',''].map((h,i) => (
+              {['#','ファンド名','上昇率','基準価額','信託報酬（年率）','出来高比',''].map((h,i) => (
                 <div key={i} style={{ fontFamily:"'Syne',sans-serif", fontSize:10, fontWeight:700,
                   color:C.muted, letterSpacing:'0.05em', textTransform:'uppercase',
                   textAlign:i>=2?'center':'left' }}>{h}</div>
@@ -255,9 +254,10 @@ export default function RankingPage() {
                   <div style={{ fontFamily:"'DM Mono',monospace", fontSize:12,
                     color:subCol, textAlign:'center' }}>{fund.price}</div>
 
-                  {/* bar */}
-                  <div style={{ display:'flex', justifyContent:'center' }}>
-                    <TondrakuBar widthPct={fund.barW} positive={fund.pct>=0}/>
+                  {/* fee */}
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:12, fontWeight:500,
+                    color:feeColor(fund.fee), textAlign:'center', letterSpacing:'0.01em' }}>
+                    {fund.fee}
                   </div>
 
                   {/* vol */}
