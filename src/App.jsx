@@ -3,6 +3,7 @@ import TrendPage from './pages/TrendPage'
 import RankingPage from './pages/RankingPage'
 import PortfolioSettingsPage from './pages/PortfolioSettingsPage'
 import AIAnalysisPage from './pages/AIAnalysisPage'
+import NewsFeed from './components/NewsFeed'
 
 const TABS = [
   { id: 'ranking',   label: 'ランキング' },
@@ -76,10 +77,47 @@ export default function App() {
         ))}
       </nav>
 
-      {active === 'ranking'   && <RankingPage />}
-      {active === 'trend'     && <TrendPage />}
+      {/* ── ランキング: 左=RankingPage / 右=NewsFeed ── */}
+      {active === 'ranking' && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 380px',
+          gap: 20,
+          alignItems: 'flex-start',
+          maxWidth: 1400,
+          margin: '0 auto',
+          padding: '0 0 40px',
+        }}>
+          <RankingPage />
+          <div style={{ position: 'sticky', top: 72, padding: '20px 20px 0 0' }}>
+            <NewsFeed />
+          </div>
+        </div>
+      )}
+
+      {/* ── 注目テーマ: フル幅 ── */}
+      {active === 'trend' && <TrendPage />}
+
+      {/* ── マイPF設定: フル幅 ── */}
       {active === 'portfolio' && <PortfolioSettingsPage />}
-      {active === 'ai' && <AIAnalysisPage />}
+
+      {/* ── AI分析: 左=AIAnalysisPage / 右=NewsFeed ── */}
+      {active === 'ai' && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 360px',
+          gap: 20,
+          alignItems: 'flex-start',
+          maxWidth: 1400,
+          margin: '0 auto',
+          padding: '0 0 40px',
+        }}>
+          <AIAnalysisPage />
+          <div style={{ position: 'sticky', top: 72, padding: '20px 20px 0 0' }}>
+            <NewsFeed compact={true} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
