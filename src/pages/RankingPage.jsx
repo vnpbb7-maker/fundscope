@@ -27,16 +27,7 @@ const formatPrice = (priceJpy) => {
 const PERIODS = ['1D','1W','1M','3M','6M','YTD','1Y']
 
 const CATEGORIES = [
-  { value:'all',        label:'全て' },
-  { value:'ai',         label:'AI・半導体' },
-  { value:'us_equity',  label:'米国株式' },
-  { value:'intl',       label:'先進国株式' },
-  { value:'em',         label:'新興国株式' },
-  { value:'jp',         label:'国内ETF' },
-  { value:'sector',     label:'セクター' },
-  { value:'bond',       label:'債券' },
-  { value:'commodity',  label:'コモディティ' },
-  { value:'balance',    label:'バランス' },
+  { value:'all', label:'全て' },
 ]
 
 const REGIONS = [
@@ -117,39 +108,38 @@ function feeColor(feeStr) {
 const fmtPct   = v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 const pctColor = v => v >= 0 ? C.up : C.down
 
-// ─── SBI証券リンク生成 ───────────────────────────────────────
-function getSbiUrl(fund) {
+// ─── 外部リンクURL生成 ────────────────────────────────────
+const getFundUrl = (fund) => {
   if (fund.type === 'us_etf') {
-    return `https://search.sbisec.co.jp/v2/popwin/info/stock/pop6040_foreign.html?sec_id=${fund.ticker}&exchange=NSD`
+    return `https://finance.yahoo.com/quote/${fund.ticker}`
   }
   if (fund.type === 'tse_etf') {
     return `https://finance.yahoo.co.jp/quote/${fund.ticker}.T`
   }
   if (fund.type === 'jp_fund' && fund.isin) {
-    return `https://site0.sbisec.co.jp/marble/fund/detail/achievement.do?Isin=${fund.isin}`
+    return `https://www.morningstar.co.jp/FundData/SnapShot.do?isinCode=${fund.isin}`
   }
   return null
 }
 
-// ─── NISAバッジ ──────────────────────────────────────────────
-const NISA_STYLES = {
-  '成長':   { bg: '#E6F1FB', color: '#0C447C', label: 'NISA成長' },
-  'つみたて': { bg: '#E1F5EE', color: '#085041', label: 'NISAつみたて' },
-  '両方':   { bg: '#F5EDD5', color: '#7A5A10', label: 'NISA両枠' },
+// ─── NISAバッジスタイル ───────────────────────────────────
+const NISA_BADGE = {
+  '成長':   { label: 'NISA成長',   bg: '#E6F1FB', color: '#0C447C' },
+  '両方':   { label: 'NISA両枠',   bg: '#F5EDD5', color: '#7A5A10' },
+  '対象外': { label: 'NISA対象外', bg: '#F1EFE8', color: '#666' },
 }
-function getNisaBadge(nisa) {
-  if (!nisa) return null
-  const s = NISA_STYLES[nisa]
-  if (!s) return null
-  return (
-    <span style={{
-      fontSize: 10, fontWeight: 600,
-      padding: '2px 7px', borderRadius: 6,
-      background: s.bg, color: s.color,
-      whiteSpace: 'nowrap', letterSpacing: '0.3px',
-      fontFamily: "'Syne',sans-serif",
-    }}>{s.label}</span>
-  )
+
+// ─── 資産クラスバッジスタイル ───────────────────────────────
+const ASSET_BADGE = {
+  '海外ETF':    { bg: '#EEEDFE', color: '#3C3489' },
+  '国内ETF':    { bg: '#FAEEDA', color: '#633806' },
+  '国内株式':   { bg: '#FAEEDA', color: '#633806' },
+  '海外株式':   { bg: '#EEEDFE', color: '#3C3489' },
+  '国内投信':   { bg: '#E1F5EE', color: '#085041' },
+  '債券':       { bg: '#F0EEFB', color: '#4A2D8A' },
+  'コモディティ': { bg: '#FFF3E0', color: '#7A4200' },
+  'REIT':        { bg: '#FBEAF0', color: '#72243E' },
+  'バランス':     { bg: '#F1EFE8', color: '#444441' },
 }
 
 // ─── Sub-components ────────────────────────────────────────────
@@ -191,7 +181,7 @@ const COL = '32px 1fr 90px 90px 70px 52px'
 // ─── RankingPage ───────────────────────────────────────────────
 export default function RankingPage() {
   const [period,      setPeriod     ] = useState('1D')
-  const [cat,         setCat        ] = useState('all')
+  const [category,    setCategory   ] = useState('all')
   const [region,      setRegion     ] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -209,25 +199,20 @@ export default function RankingPage() {
   const filtered = useMemo(() => {
     return funds.filter(f => {
       if (region !== 'all' && f.region !== region) return false
-      if (cat === 'all') return true
-      if (cat === 'ai')        return f.category === 'AI・半導体'
-      if (cat === 'us_equity') return ['米国株式','米国グロース'].includes(f.category)
-      if (cat === 'intl')      return ['先進国株式','アジア太平洋','全世界・先進国'].includes(f.category)
-      if (cat === 'em')        return ['新興国株式','インド','新興国'].includes(f.category)
-      if (cat === 'jp')        return ['国内ETF','国内株式','日本株'].includes(f.category)
-      if (cat === 'sector')    return ['情報技術','ヘルスケア','金融','エネルギー','資本財','生活必需品','公益事業','素材','不動産','通信','防衛・地政学','革新的技術','クリーンエネルギー'].includes(f.category)
-      if (cat === 'bond')      return ['米国債券','長期米国債','投資適格社債','ハイイールド債','新興国債券','国際債券','外国債券','債券・REIT'].includes(f.category)
-      if (cat === 'commodity') return ['コモディティ','コモディティ総合','金','銀'].includes(f.category)
-      if (cat === 'balance')   return ['バランス','バランス・その他'].includes(f.category)
-      return true
+      if (!category || category === 'all') return true
+      if (category === 'nisa_成長') return f.nisa === '成長'
+      if (category === 'nisa_両方') return f.nisa === '両方'
+      if (['海外ETF','国内ETF','国内投信','コモディティ','債券','REIT'].includes(category)) {
+        return f.assetClass === category
+      }
+      return f.category === category
     })
-  }, [funds, cat, region])
+  }, [funds, category, region])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage   = Math.min(currentPage, totalPages)
   const pageData   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  function changeCat(v)    { setCat(v);    setCurrentPage(1) }
   function changeRegion(v) { setRegion(v); setCurrentPage(1) }
 
   function goPage(n) {
@@ -327,8 +312,29 @@ export default function RankingPage() {
 
           <div style={{ width:1, height:22, background:C.border, flexShrink:0 }}/>
 
-          <select value={cat}    onChange={e => changeCat(e.target.value)}    style={selectStyle}>
-            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          <select value={category} onChange={e => { setCategory(e.target.value); setCurrentPage(1) }} style={selectStyle}>
+            <option value="all">全て</option>
+            <optgroup label="資産クラス">
+              <option value="海外ETF">海外ETF</option>
+              <option value="国内ETF">国内ETF</option>
+              <option value="国内投信">国内投信</option>
+              <option value="コモディティ">コモディティ</option>
+              <option value="債券">債券</option>
+              <option value="REIT">REIT</option>
+            </optgroup>
+            <optgroup label="NISA区分">
+              <option value="nisa_成長">NISA成長のみ</option>
+              <option value="nisa_両方">NISA両枠対応</option>
+            </optgroup>
+            <optgroup label="テーマ">
+              <option value="AI・半導体">AI・半導体</option>
+              <option value="防衛・地政学">防衛・地政学</option>
+              <option value="全世界・先進国">全世界・先進国</option>
+              <option value="日本株">日本株</option>
+              <option value="新興国">新興国</option>
+              <option value="ヘルスケア">ヘルスケア</option>
+              <option value="クリーンエネルギー">クリーンエネルギー</option>
+            </optgroup>
           </select>
           <select value={region} onChange={e => changeRegion(e.target.value)} style={selectStyle}>
             {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -412,18 +418,19 @@ export default function RankingPage() {
                 const displayChange = fund.change ?? 0
 
                 return (
-                  <div key={fund.id || fund.rank}
-                    onClick={() => {
-                      const url = getSbiUrl(fund)
-                      if (url) window.open(url, '_blank', 'noopener,noreferrer')
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = fund.isOwned ? '#EDE5C4' : '#F0EFEC'}
-                    onMouseLeave={e => e.currentTarget.style.background = fund.isOwned ? C.goldLight : C.card}
+                  <a key={fund.id || fund.rank}
+                    href={getFundUrl(fund) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onMouseEnter={e => { e.currentTarget.style.background = fund.isOwned ? '#EDE5C4' : '#F8F7F4' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = fund.isOwned ? C.goldLight : C.card }}
                     style={{ display:'grid', gridTemplateColumns:COL,
-                      padding:'12px 20px', gap:12, alignItems:'center',
+                      padding:'13px 16px', gap:8, alignItems:'center',
+                      textDecoration:'none', color:'inherit',
                       background:fund.isOwned ? C.goldLight : C.card,
-                      borderBottom:isLast ? 'none' : `1px solid ${fund.isOwned ? '#E8D9A8' : C.border}`,
-                      cursor:'pointer', transition:'background .15s' }}>
+                      borderBottom:isLast ? 'none' : `0.5px solid ${fund.isOwned ? '#E8D9A8' : 'rgba(26,26,46,0.06)'}`,
+                      cursor: getFundUrl(fund) ? 'pointer' : 'default',
+                      transition:'background .1s' }}>
 
                     {/* rank */}
                     <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:500,
@@ -432,30 +439,62 @@ export default function RankingPage() {
                       {fund.rank}
                     </div>
 
-                    {/* name + reason + tags */}
+                    {/* name + tags */}
                     <div style={{ display:'flex', flexDirection:'column', gap:2, minWidth:0 }}>
                       <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                         <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:600, fontSize:14,
                           color:C.ink, letterSpacing:'-0.2px', whiteSpace:'nowrap' }}>
                           {fund.shortName}
                         </span>
-                        <span style={{ fontSize:10, color:C.gold, opacity:0.8 }}>↗</span>
+                        <span style={{ fontSize:'10px', color:C.gold, marginLeft:'4px', opacity:0.8 }}>↗</span>
                         {fund.ticker && fund.ticker !== '—' && (
                           <span style={{ fontFamily:"'DM Mono',monospace",
                             fontSize:11, color:'#888' }}>{fund.ticker}</span>
                         )}
-                        {getNisaBadge(fund.nisa)}
-                        {fund.isOwned && <OwnedBadge/>}
                       </div>
                       {fund.reason && (
                         <div style={{ fontSize:12,
                           color:fund.isOwned ? '#3A3A4E' : '#5A5A6A',
-                          marginTop:4, lineHeight:1.5 }}>
+                          marginTop:2, lineHeight:1.5 }}>
                           {fund.reason}
                         </div>
                       )}
-                      <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:2 }}>
-                        <RankCatTag label={fund.category}/>
+                      <div style={{ display:'flex', alignItems:'center', gap:'4px', flexWrap:'wrap', marginTop:'4px' }}>
+                        {/* 資産クラスタグ */}
+                        {fund.assetClass && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background: ASSET_BADGE[fund.assetClass]?.bg || '#F1EFE8',
+                            color: ASSET_BADGE[fund.assetClass]?.color || '#444',
+                            whiteSpace:'nowrap',
+                          }}>
+                            {fund.assetClass}
+                          </span>
+                        )}
+                        {/* NISAバッジ */}
+                        {fund.nisa && NISA_BADGE[fund.nisa] && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background: NISA_BADGE[fund.nisa].bg,
+                            color: NISA_BADGE[fund.nisa].color,
+                            whiteSpace:'nowrap',
+                          }}>
+                            {NISA_BADGE[fund.nisa].label}
+                          </span>
+                        )}
+                        {/* 保有中バッジ */}
+                        {fund.isOwned && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background:C.gold, color:C.ink,
+                            whiteSpace:'nowrap',
+                          }}>
+                            保有中
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -478,7 +517,7 @@ export default function RankingPage() {
                     </div>
 
                     <div/>
-                  </div>
+                  </a>
                 )
               })}
             </div>

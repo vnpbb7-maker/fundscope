@@ -55,7 +55,39 @@ function mapCategoryToTheme(category) {
   return 'バランス・その他'
 }
 
-// ─── Sector Heatmap Data（テーマ別平均騰落率を動的に計算） ──────
+// ─── 外部リンクURL生成 ──────────────────────────────────
+const getFundUrl = (fund) => {
+  if (fund.type === 'us_etf') {
+    return `https://finance.yahoo.com/quote/${fund.ticker}`
+  }
+  if (fund.type === 'tse_etf') {
+    return `https://finance.yahoo.co.jp/quote/${fund.ticker}.T`
+  }
+  if (fund.type === 'jp_fund' && fund.isin) {
+    return `https://www.morningstar.co.jp/FundData/SnapShot.do?isinCode=${fund.isin}`
+  }
+  return null
+}
+
+// ─── NISAバッジスタイル ───────────────────────────────
+const NISA_BADGE = {
+  '成長':   { label: 'NISA成長',   bg: '#E6F1FB', color: '#0C447C' },
+  '両方':   { label: 'NISA両枠',   bg: '#F5EDD5', color: '#7A5A10' },
+  '対象外': { label: 'NISA対象外', bg: '#F1EFE8', color: '#666' },
+}
+
+// ─── 資産クラスバッジスタイル ─────────────────────────────
+const ASSET_BADGE = {
+  '海外ETF':    { bg: '#EEEDFE', color: '#3C3489' },
+  '国内ETF':    { bg: '#FAEEDA', color: '#633806' },
+  '国内株式':   { bg: '#FAEEDA', color: '#633806' },
+  '海外株式':   { bg: '#EEEDFE', color: '#3C3489' },
+  '国内投信':   { bg: '#E1F5EE', color: '#085041' },
+  '債券':       { bg: '#F0EEFB', color: '#4A2D8A' },
+  'コモディティ': { bg: '#FFF3E0', color: '#7A4200' },
+  'REIT':        { bg: '#FBEAF0', color: '#72243E' },
+  'バランス':     { bg: '#F1EFE8', color: '#444441' },
+}
 
 // ─── Tag colors ───────────────────────────────────────────────
 const THEME_TAG_COLOR = {
@@ -79,40 +111,6 @@ function feeColor(feeStr) {
   return C.down
 }
 
-// ─── SBI証券リンク生成 ──────────────────────────────
-function getSbiUrl(fund) {
-  if (fund.type === 'us_etf') {
-    return `https://search.sbisec.co.jp/v2/popwin/info/stock/pop6040_foreign.html?sec_id=${fund.ticker}&exchange=NSD`
-  }
-  if (fund.type === 'tse_etf') {
-    return `https://finance.yahoo.co.jp/quote/${fund.ticker}.T`
-  }
-  if (fund.type === 'jp_fund' && fund.isin) {
-    return `https://site0.sbisec.co.jp/marble/fund/detail/achievement.do?Isin=${fund.isin}`
-  }
-  return null
-}
-
-// ─── NISAバッジ ────────────────────────────────────────────
-const NISA_STYLES = {
-  '成長':   { bg: '#E6F1FB', color: '#0C447C', label: 'NISA成長' },
-  'つみたて': { bg: '#E1F5EE', color: '#085041', label: 'NISAつみたて' },
-  '両方':   { bg: '#F5EDD5', color: '#7A5A10', label: 'NISA両枠' },
-}
-function getNisaBadge(nisa) {
-  if (!nisa) return null
-  const s = NISA_STYLES[nisa]
-  if (!s) return null
-  return (
-    <span style={{
-      fontSize: 10, fontWeight: 600,
-      padding: '2px 7px', borderRadius: 6,
-      background: s.bg, color: s.color,
-      whiteSpace: 'nowrap', letterSpacing: '0.3px',
-      fontFamily: "'Syne',sans-serif",
-    }}>{s.label}</span>
-  )
-}
 
 const fmtPct   = v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 const pctColor = v => v >= 0 ? C.up   : C.down
@@ -384,18 +382,19 @@ export default function TrendPage() {
                 const theme = mapCategoryToTheme(fund.category)
 
                 return (
-                  <div key={fund.id || idx}
-                    onClick={() => {
-                      const url = getSbiUrl(fund)
-                      if (url) window.open(url, '_blank', 'noopener,noreferrer')
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = fund.isOwned ? '#EDE5C4' : '#F0EFEC'}
-                    onMouseLeave={e => e.currentTarget.style.background = fund.isOwned ? C.goldLight : C.card}
+                  <a key={fund.id || idx}
+                    href={getFundUrl(fund) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onMouseEnter={e => { e.currentTarget.style.background = fund.isOwned ? '#EDE5C4' : '#F8F7F4' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = fund.isOwned ? C.goldLight : C.card }}
                     style={{ display:'grid', gridTemplateColumns:COL,
-                      padding:'12px 20px', gap:12, alignItems:'center',
+                      padding:'13px 16px', gap:8, alignItems:'center',
+                      textDecoration:'none', color:'inherit',
                       background:fund.isOwned ? C.goldLight : C.card,
-                      borderBottom:isLast ? 'none' : `1px solid ${fund.isOwned ? '#E8D9A8' : C.border}`,
-                      cursor:'pointer', transition:'background .15s' }}>
+                      borderBottom:isLast ? 'none' : `0.5px solid ${fund.isOwned ? '#E8D9A8' : 'rgba(26,26,46,0.06)'}`,
+                      cursor: getFundUrl(fund) ? 'pointer' : 'default',
+                      transition:'background .1s' }}>
 
                     {/* name + reason + badges */}
                     <div style={{ display:'flex', flexDirection:'column', gap:3, minWidth:0 }}>
@@ -404,19 +403,52 @@ export default function TrendPage() {
                           color:C.ink, whiteSpace:'nowrap' }}>
                           {fund.shortName}
                         </span>
-                        <span style={{ fontSize:10, color:C.gold, opacity:0.8 }}>↗</span>
+                        <span style={{ fontSize:'10px', color:C.gold, marginLeft:'4px', opacity:0.8 }}>↗</span>
                         {fund.ticker && (
                           <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:C.muted }}>
                             {fund.ticker}
                           </span>
                         )}
-                        {fund.isOwned && <OwnedBadge/>}
                       </div>
                       {fund.reason && (
                         <div style={{ fontSize:11, color:reasonColor, fontStyle:'italic', lineHeight:1.5 }}>
                           {fund.reason}
                         </div>
                       )}
+                      <div style={{ display:'flex', alignItems:'center', gap:'4px', flexWrap:'wrap', marginTop:'4px' }}>
+                        {fund.assetClass && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background: ASSET_BADGE[fund.assetClass]?.bg || '#F1EFE8',
+                            color: ASSET_BADGE[fund.assetClass]?.color || '#444',
+                            whiteSpace:'nowrap',
+                          }}>
+                            {fund.assetClass}
+                          </span>
+                        )}
+                        {fund.nisa && NISA_BADGE[fund.nisa] && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background: NISA_BADGE[fund.nisa].bg,
+                            color: NISA_BADGE[fund.nisa].color,
+                            whiteSpace:'nowrap',
+                          }}>
+                            {NISA_BADGE[fund.nisa].label}
+                          </span>
+                        )}
+                        {fund.isOwned && (
+                          <span style={{
+                            fontSize:'10px', fontWeight:600,
+                            padding:'2px 7px', borderRadius:'6px',
+                            background:C.gold, color:C.ink,
+                            whiteSpace:'nowrap',
+                          }}>
+                            保有中
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* change % */}
@@ -442,7 +474,7 @@ export default function TrendPage() {
                     <div>
                       <ThemeTag label={theme}/>
                     </div>
-                  </div>
+                  </a>
                 )
               })}
             </div>
